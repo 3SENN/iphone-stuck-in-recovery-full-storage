@@ -1,0 +1,11 @@
+The patches in this directory modify idevicerestore
+(https://github.com/libimobiledevice/idevicerestore).
+
+Like idevicerestore itself, they are licensed under the GNU Lesser General
+Public License, version 2.1 or (at your option) any later version
+(SPDX-License-Identifier: LGPL-2.1-or-later).
+
+The full license text is in idevicerestore's COPYING file:
+https://github.com/libimobiledevice/idevicerestore/blob/master/COPYING
+
+The rest of this repository is released under CC0 1.0; see ../LICENSE.

@@ -1,0 +1,15 @@
+# Firmware, signing tickets and device logs contain device identifiers.
+# Never commit them.
+*.ipsw
+*.shsh
+*.shsh2
+*.plist
+*.log
+
+# Local build of idevicerestore, if cloned inside this repo
+/idevicerestore/
+
+# Python and macOS
+__pycache__/
+*.pyc
+.DS_Store

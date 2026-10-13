@@ -1,0 +1,64 @@
+name: Report a result
+description: Tell others whether the fix worked on your device.
+title: "[Result] <model>, iOS <version>: worked / did not work"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! So far I've only tested this on my own iPhone, so every
+        result helps others decide whether to try it. — Senne
+
+        **Remove your ECID and serial number** from anything you paste.
+  - type: dropdown
+    id: outcome
+    attributes:
+      label: Did it work?
+      options:
+        - "Yes: the phone started with its data"
+        - "No: still stuck in Recovery"
+        - "Partly (explain below)"
+    validations:
+      required: true
+  - type: input
+    id: model
+    attributes:
+      label: Model identifier
+      description: The PRODUCT line from `irecovery -q`.
+      placeholder: iPhone16,1
+    validations:
+      required: true
+  - type: input
+    id: capacity
+    attributes:
+      label: Storage capacity
+      placeholder: 128 GB
+  - type: input
+    id: failed-update
+    attributes:
+      label: Update that originally failed
+      placeholder: iOS 26.5 to 27.0, via Finder
+  - type: input
+    id: ipsw
+    attributes:
+      label: IPSW you restored with
+      placeholder: iPhone16,1_27.0.1_24A446_Restore.ipsw
+    validations:
+      required: true
+  - type: textarea
+    id: suggest-output
+    attributes:
+      label: Output of suggest_cryptex_size.py
+      description: "Run `python3 tools/suggest_cryptex_size.py <ipsw> --log <restore log>` and paste the output."
+      render: text
+  - type: input
+    id: values
+    attributes:
+      label: IDEVICERESTORE_CRYPTEX_SIZE_MIB values you tried
+      placeholder: "6500"
+    validations:
+      required: true
+  - type: textarea
+    id: notes
+    attributes:
+      label: Anything else
+      description: Error lines if it failed, anything missing from the phone afterwards, and so on.

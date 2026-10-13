@@ -1,0 +1,93 @@
+From 43728bd2057fa05a9390102ab13a0cc3eb3d17f1 Mon Sep 17 00:00:00 2001
+From: Senne <sennechin@gmail.com>
+Date: Tue, 13 Oct 2026 10:13:20 +0000
+Subject: [PATCH] restore: Allow overriding the declared Cryptex1,SystemOSSize
+
+A data-preserving update can fail in install_splat on a nearly full
+device with:
+
+  Transfer: Failed preallocation due to space. No hope in this
+  succeeding, bailing.
+
+restored's space preflight takes the system cryptex size from
+Info/Cryptex1,SystemOSSize in the BuildIdentityDict we send, while the
+actual preallocation uses the real size from the cryptex image. On a
+tight container the preflight passes, the low-space cleanup is skipped,
+and the one-shot preallocation is then refused by APFS.
+
+Add an opt-in IDEVICERESTORE_CRYPTEX_SIZE_MIB environment variable that
+declares a larger size. The preflight then reports low space, restored
+runs its cleanup, and the real-size preallocation succeeds.
+
+When the variable is not set, the build identity is sent unchanged.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
+---
+ src/restore.c | 46 +++++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 45 insertions(+), 1 deletion(-)
+
+diff --git a/src/restore.c b/src/restore.c
+index 1913835..6cb1fea 100644
+--- a/src/restore.c
++++ b/src/restore.c
+@@ -4592,6 +4592,47 @@ int restore_send_restore_local_policy(struct idevicerestore_client_t* client, pl
+ 	return 0;
+ }
+ 
++/*
++ * Optional workaround for data-preserving updates that fail in install_splat with
++ * "Failed preallocation due to space" on a nearly full device.
++ *
++ * restored's space preflight (SpaceNeededForRestore) reads the system cryptex size
++ * from Info/Cryptex1,SystemOSSize in the BuildIdentityDict sent by the host. The
++ * actual preallocation uses the real size from the cryptex image. Declaring a value
++ * larger than the real size makes the preflight report low space, so restored runs
++ * its low-space cleanup before installing the cryptex. That frees enough room for
++ * the real preallocation to succeed.
++ *
++ * Opt-in: set IDEVICERESTORE_CRYPTEX_SIZE_MIB to the size to declare, in MiB.
++ * When it is not set, the build identity is sent unchanged.
++ */
++static void _restore_override_cryptex_size(plist_t build_identity)
++{
++	const char* env = getenv("IDEVICERESTORE_CRYPTEX_SIZE_MIB");
++	if (!env || !*env) {
++		return;
++	}
++
++	char* end = NULL;
++	uint64_t declared_mib = strtoull(env, &end, 10);
++	if (*end != '\0' || declared_mib == 0) {
++		logger(LL_WARNING, "Ignoring invalid IDEVICERESTORE_CRYPTEX_SIZE_MIB value '%s'\n", env);
++		return;
++	}
++
++	plist_t info = plist_dict_get_item(build_identity, "Info");
++	plist_t node = (info) ? plist_dict_get_item(info, "Cryptex1,SystemOSSize") : NULL;
++	if (!node) {
++		logger(LL_WARNING, "IDEVICERESTORE_CRYPTEX_SIZE_MIB is set, but the build identity has no Cryptex1,SystemOSSize; ignoring\n");
++		return;
++	}
++
++	uint64_t real_mib = 0;
++	plist_get_uint_val(node, &real_mib);
++	plist_dict_set_item(info, "Cryptex1,SystemOSSize", plist_new_uint(declared_mib));
++	logger(LL_INFO, "Declaring Cryptex1,SystemOSSize as %" PRIu64 " MiB (real size %" PRIu64 " MiB)\n", declared_mib, real_mib);
++}
++
+ int restore_send_buildidentity(struct idevicerestore_client_t* client, plist_t message)
+ {
+ 	restored_error_t restore_error;
+@@ -4607,8 +4648,11 @@ int restore_send_buildidentity(struct idevicerestore_client_t* client, plist_t m
+ 
+ 	plist_t build_identity = restore_get_build_identity_from_request(client, message);
+ 
++	plist_t build_identity_to_send = plist_copy(build_identity);
++	_restore_override_cryptex_size(build_identity_to_send);
++
+ 	dict = plist_new_dict();
+-	plist_dict_set_item(dict, "BuildIdentityDict", plist_copy(build_identity));
++	plist_dict_set_item(dict, "BuildIdentityDict", build_identity_to_send);
+ 
+ 	plist_t node = plist_access_path(message, 2, "Arguments", "Variant");
+ 	if(node) {
