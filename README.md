@@ -93,6 +93,31 @@ make -j4 && make install
 applies to newer commits. Run the remaining steps from this `idevicerestore`
 folder.
 
+> **iPhone 16 and newer: build libtatsu from source first.** The libtatsu 1.0.5
+> release (what Homebrew installs) picks the wrong Face ID firmware component on
+> newer IPSWs, so the restore stops with `Unable to fetch Yonkers ticket` before
+> it reaches the storage step. The fix is upstream
+> ([libtatsu `cdbca26`](https://github.com/libimobiledevice/libtatsu/commit/cdbca263fa480b118bd458e32c6eeddafd48e35d))
+> but not released yet. From the `idevicerestore` folder, build it and rebuild
+> idevicerestore against it:
+>
+> ```sh
+> cd ..
+> git clone https://github.com/libimobiledevice/libtatsu.git
+> cd libtatsu
+> ./autogen.sh --prefix="$PWD/install" --enable-static --disable-shared
+> make -j4 && make install
+> cd ../idevicerestore
+> make distclean
+> export PKG_CONFIG_PATH="$PWD/../libtatsu/install/lib/pkgconfig:$(brew --prefix)/lib/pkgconfig"
+> ./autogen.sh --prefix="$PWD/install"
+> make -j4 && make install
+> ```
+>
+> `strings ./install/bin/idevicerestore | grep -x 'Yonkers,SysTopPatch'` prints
+> a line when the newer libtatsu is in. Needed on an iPhone 16 Pro (`iPhone17,1`)
+> with iOS 27.2 (24B119).
+
 ### 2. Check that the phone is in Recovery mode
 
 ```sh
@@ -161,6 +186,7 @@ when the phone asks, and tap **Trust** if your Mac asks.
 |--------------|------------|
 | The same `Failed preallocation` error | The value is probably too small to trigger the cleanup. If you didn't use `--log`, run step 5 with the new log. Otherwise raise the value by 200 and retry. |
 | No `Declaring Cryptex1,SystemOSSize` line | The fix isn't active. Check that you ran `./install/bin/idevicerestore` and set the variable on the same command line. |
+| `Unable to fetch Yonkers ticket` | libtatsu is too old for your IPSW. Build libtatsu from source as described in step 1, rebuild idevicerestore, and retry. |
 | `FAILURE:68 downgrade_check` | The IPSW is older than the update that failed. Use the same or a newer version. |
 | Any other error | This is probably a different problem. [Open an issue](https://github.com/3SENN/iphone-stuck-in-recovery-full-storage/issues/new?template=result.yml) and attach the log, with your ECID and serial number removed. |
 
