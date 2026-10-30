@@ -93,10 +93,10 @@ make -j4 && make install
 applies to newer commits. Run the remaining steps from this `idevicerestore`
 folder.
 
-> **iPhone 16 and newer: build libtatsu from source first.** The libtatsu 1.0.5
-> release (what Homebrew installs) picks the wrong Face ID firmware component on
-> newer IPSWs, so the restore stops with `Unable to fetch Yonkers ticket` before
-> it reaches the storage step. The fix is upstream
+> **iPhone 14 and newer: build libtatsu from source first.** The libtatsu 1.0.5
+> release (what Homebrew installs) picks the wrong firmware component from the
+> iOS 27 IPSWs for these models, so the restore stops with
+> `Unable to fetch Yonkers ticket` before it reaches the storage step. The fix is upstream
 > ([libtatsu `cdbca26`](https://github.com/libimobiledevice/libtatsu/commit/cdbca263fa480b118bd458e32c6eeddafd48e35d))
 > but not released yet. From the `idevicerestore` folder, build it and rebuild
 > idevicerestore against it:
@@ -115,8 +115,9 @@ folder.
 > ```
 >
 > `strings ./install/bin/idevicerestore | grep -x 'Yonkers,SysTopPatch'` prints
-> a line when the newer libtatsu is in. Needed on an iPhone 16 Pro (`iPhone17,1`)
-> with iOS 27.2 (24B119).
+> a line when the newer libtatsu is in. I needed this for my iPhone 15 Pro too.
+> The iPhone 13 models and older, and the iPhone SE (3rd generation), don't need
+> it, but it does no harm there.
 
 ### 2. Check that the phone is in Recovery mode
 
