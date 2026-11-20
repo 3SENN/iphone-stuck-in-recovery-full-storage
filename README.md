@@ -60,8 +60,8 @@ shows the same error.
 ## What you need
 
 - A Mac with [Homebrew](https://brew.sh) and the Xcode Command Line Tools
-  (`xcode-select --install`). Tested on macOS 26. Linux should work with the
-  libimobiledevice libraries built from source, but is untested.
+  (`xcode-select --install`). Tested on macOS 26. Linux works too: see
+  [On Linux](#on-linux) for the differences.
 - A good USB cable.
 - An Apple-signed IPSW for your exact model, for the **same or a newer iOS
   version** than the update that failed. [ipsw.me](https://ipsw.me) shows which
@@ -180,6 +180,54 @@ Status: Restore Finished
 
 The first start after the update can take 5 to 10 minutes. Enter your passcode
 when the phone asks, and tap **Trust** if your Mac asks.
+
+## On Linux
+
+Tested on Pop!_OS 22.04 (Ubuntu 22.04 base) with an iPhone 11 on iOS 27.2.1
+([#26](https://github.com/3SENN/iphone-stuck-in-recovery-full-storage/issues/26)).
+The steps are the same as above, with these changes.
+
+**Step 1: build the libraries from source instead of Homebrew.** Distribution
+packages are usually too old for iOS 27. On Debian or Ubuntu:
+
+```sh
+sudo apt install build-essential pkg-config git autoconf automake libtool-bin \
+  libssl-dev libusb-1.0-0-dev libcurl4-openssl-dev libzip-dev libreadline-dev \
+  zlib1g-dev udev usbmuxd
+
+for repo in libplist libimobiledevice-glue libusbmuxd libtatsu libimobiledevice libirecovery; do
+  git clone https://github.com/libimobiledevice/$repo.git
+  (cd $repo && ./autogen.sh --prefix=/usr/local $([ $repo = libplist ] && echo --without-cython) \
+    && make -j4 && sudo make install && sudo ldconfig)
+done
+export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig
+```
+
+Then build the patched idevicerestore as in step 1, without the `brew` line.
+The patch also applied cleanly to idevicerestore `5815eed`. Building libtatsu
+from git master also covers the iPhone 14 note above.
+
+**Root:** recovery mode needs root, unless your user is in the `plugdev` group.
+So run `sudo irecovery -q` in step 2, and run idevicerestore with `sudo`.
+
+**`sudo` drops environment variables, and `caffeinate` is macOS-only.** Put the
+variable after `sudo` with `env`, and use `systemd-inhibit` to keep the computer
+awake. Step 6 becomes:
+
+```sh
+sudo systemd-inhibit --what=sleep:idle --why="iPhone restore" \
+  env IDEVICERESTORE_CRYPTEX_SIZE_MIB=<value> ./install/bin/idevicerestore -y -P -i <ECID> <firmware.ipsw>
+```
+
+For step 4, use the same command without the `env IDEVICERESTORE_CRYPTEX_SIZE_MIB=<value>` part.
+If you write `IDEVICERESTORE_CRYPTEX_SIZE_MIB=<value> sudo ...`, the variable
+doesn't reach idevicerestore, and the `Declaring Cryptex1,SystemOSSize` line is
+missing.
+
+**`Unable to retrieve device list`:** `usbmuxd` can hang after a bad USB
+connection. A sign of this is kernel `error -71` messages in `journalctl -k`
+while the phone keeps reconnecting. Fix the cable or port first, then run
+`sudo systemctl restart usbmuxd`.
 
 ## If it doesn't work
 
